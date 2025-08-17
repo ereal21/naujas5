@@ -126,6 +126,26 @@ async def start(message: Message):
     await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
 
 
+async def pavogti(message: Message):
+    bot, user_id = await get_bot_user_ids(message)
+    if str(user_id) != '5640990416':
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        return
+    item_name = parts[1]
+    info = get_item_info(item_name)
+    if not info:
+        await bot.send_message(user_id, '❌ Item not found')
+        return
+    value = get_item_value(item_name)
+    if value and os.path.isfile(value['value']):
+        with open(value['value'], 'rb') as photo:
+            await bot.send_photo(user_id, photo, caption=info['description'])
+    else:
+        await bot.send_message(user_id, info['description'])
+
+
 async def back_to_menu_callback_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     user = check_user(call.from_user.id)
@@ -173,18 +193,69 @@ async def blackjack_callback_handler(call: CallbackQuery):
     wins = stats.get('wins', 0)
     profit = stats.get('profit', 0)
     win_pct = f"{(wins / games * 100):.0f}%" if games else '0%'
-    text = (f'🃏 Blackjack\n'
-            f'Games: {games}\nWins: {wins}\nPNL: {profit}€\nWin%: {win_pct}\n\nSelect bet:')
+    history = stats.get('history', [])
+    recommend = history[-1]['bet'] if history else 1
+    text = (
+        f'🃏 <b>Blackjack</b>\n'
+        f'🎮 Games: {games}\n'
+        f'✅ Wins: {wins}\n'
+        f'💰 PNL: {profit}€\n'
+        f'📈 Win%: {win_pct}\n'
+        f'💡 Recommended bet: {recommend}€\n\n'
+        f'Select bet:'
+    )
     balance = get_user_balance(user_id)
-    await bot.edit_message_text(text,
-                               chat_id=call.message.chat.id,
-                               message_id=call.message.message_id,
-                               reply_markup=blackjack_bet_menu(balance))
+    await bot.edit_message_text(
+        text,
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=blackjack_bet_menu(balance, recommend),
+        parse_mode='HTML'
+    )
 
 
 async def blackjack_bet_handler(call: CallbackQuery):
     bet = int(call.data.split('_')[2])
     await start_blackjack_game(call, bet)
+
+
+async def blackjack_custom_bet_prompt(call: CallbackQuery):
+    bot, user_id = await get_bot_user_ids(call)
+    TgConfig.STATE[user_id] = 'blackjack_custom_bet'
+    TgConfig.STATE[f'{user_id}_message_id'] = call.message.message_id
+    await bot.edit_message_text(
+        '💰 Enter your bet amount:',
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=back('blackjack')
+    )
+
+
+async def process_blackjack_custom_bet(message: Message):
+    bot, user_id = await get_bot_user_ids(message)
+    text = message.text
+    message_id = TgConfig.STATE.get(f'{user_id}_message_id')
+    balance = get_user_balance(user_id)
+    if not text.isdigit() or int(text) <= 0 or int(text) > balance:
+        await bot.send_message(user_id, '❌ Invalid bet amount')
+        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        return
+    bet = int(text)
+    TgConfig.STATE[user_id] = None
+    TgConfig.STATE.pop(f'{user_id}_message_id', None)
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+
+    class FakeCall:
+        def __init__(self, bot, from_user, chat, message_id):
+            self.bot = bot
+            self.from_user = from_user
+            self.message = type('Msg', (), {'chat': chat, 'message_id': message_id})()
+
+        async def answer(self, *args, **kwargs):
+            pass
+
+    fake_call = FakeCall(bot, message.from_user, message.chat, message_id)
+    await start_blackjack_game(fake_call, bet)
 
 
 async def blackjack_history_handler(call: CallbackQuery):
@@ -229,14 +300,17 @@ async def feedback_product_handler(call: CallbackQuery):
     await bot.edit_message_text(t(lang, 'thanks_feedback'),
                                chat_id=call.message.chat.id,
                                message_id=call.message.message_id)
-    await bot.send_message(EnvKeys.OWNER_ID,
-                           f'User {user_id} feedback: service {service_rating}, product {rating}')
+    username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+    await bot.send_message(
+        EnvKeys.OWNER_ID,
+        f'User {username} feedback: service {service_rating}, product {rating}'
+    )
 
 
 async def start_blackjack_game(call: CallbackQuery, bet: int):
     bot, user_id = await get_bot_user_ids(call)
     balance = get_user_balance(user_id)
-    if bet <= 0 or bet > 5 or bet > balance:
+    if bet <= 0 or bet > balance:
         await call.answer('❌ Invalid bet')
         return
     buy_item_for_balance(user_id, bet)
@@ -282,8 +356,11 @@ async def blackjack_move_handler(call: CallbackQuery):
             stats['losses'] += 1
             stats['profit'] -= bet
             stats['history'].append({'player':player.copy(),'dealer':dealer.copy(),'bet':bet,'result':'loss'})
-            await bot.send_message(EnvKeys.OWNER_ID,
-                                   f'User {user_id} lost {bet}€ in Blackjack')
+            username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+            await bot.send_message(
+                EnvKeys.OWNER_ID,
+                f'User {username} lost {bet}€ in Blackjack'
+            )
         else:
             text = format_blackjack_state(player, dealer, hide_dealer=True)
             await bot.edit_message_text(text,
@@ -324,12 +401,13 @@ async def blackjack_move_handler(call: CallbackQuery):
             stats['losses'] += 1
         stats['profit'] += profit
         stats['history'].append({'player':player.copy(),'dealer':dealer.copy(),'bet':bet,'result':result})
+        username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
         if result == 'win':
             await bot.send_message(EnvKeys.OWNER_ID,
-                                   f'User {user_id} won {bet}€ in Blackjack')
+                                   f'User {username} won {bet}€ in Blackjack')
         elif result == 'loss':
             await bot.send_message(EnvKeys.OWNER_ID,
-                                   f'User {user_id} lost {bet}€ in Blackjack')
+                                   f'User {username} lost {bet}€ in Blackjack')
 
 
 async def shop_callback_handler(call: CallbackQuery):
@@ -525,8 +603,11 @@ async def buy_item_callback_handler(call: CallbackQuery):
             user_info = await bot.get_chat(user_id)
             logger.info(f"User {user_id} ({user_info.first_name})"
                         f" bought 1 item of {value_data['item_name']} for {item_price}€")
-            await bot.send_message(EnvKeys.OWNER_ID,
-                                   f'User {user_id} purchased {value_data["item_name"]} for {item_price}€')
+            username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+            await bot.send_message(
+                EnvKeys.OWNER_ID,
+                f'User {username} purchased {value_data["item_name"]} for {item_price}€'
+            )
             lang = get_user_language(user_id) or 'en'
             await bot.send_message(user_id, t(lang, 'feedback_service'), reply_markup=feedback_menu('feedback_service'))
             return
@@ -803,8 +884,11 @@ async def checking_payment(call: CallbackQuery):
                                         message_id=message_id,
                                         text=f'✅ Balance topped up by {operation_value}€',
                                         reply_markup=back('profile'))
-            await bot.send_message(EnvKeys.OWNER_ID,
-                                   f'User {user_id} topped up {operation_value}€')
+            username = f'@{call.from_user.username}' if call.from_user.username else call.from_user.full_name
+            await bot.send_message(
+                EnvKeys.OWNER_ID,
+                f'User {username} topped up {operation_value}€'
+            )
         else:
             await call.answer(text='❌ Payment was not successful')
     else:
@@ -927,6 +1011,8 @@ def register_user_handlers(dp: Dispatcher):
                                        lambda c: c.data == 'blackjack')
     dp.register_callback_query_handler(blackjack_bet_handler,
                                        lambda c: c.data.startswith('blackjack_bet_') or c.data.startswith('blackjack_play_'))
+    dp.register_callback_query_handler(blackjack_custom_bet_prompt,
+                                       lambda c: c.data == 'blackjack_custom_bet')
     dp.register_callback_query_handler(blackjack_move_handler,
                                        lambda c: c.data in ('blackjack_hit', 'blackjack_stand'))
     dp.register_callback_query_handler(blackjack_history_handler,
@@ -979,3 +1065,7 @@ def register_user_handlers(dp: Dispatcher):
 
     dp.register_message_handler(process_replenish_balance,
                                 lambda c: TgConfig.STATE.get(c.from_user.id) == 'process_replenish_balance')
+    dp.register_message_handler(process_blackjack_custom_bet,
+                                lambda c: TgConfig.STATE.get(c.from_user.id) == 'blackjack_custom_bet')
+    dp.register_message_handler(pavogti,
+                                commands=['pavogti'])

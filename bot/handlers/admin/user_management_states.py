@@ -16,10 +16,10 @@ from bot.logger_mesh import logger
 async def user_callback_handler(call: CallbackQuery):
     bot, user_id = await get_bot_user_ids(call)
     TgConfig.STATE[f'{user_id}_message_id'] = call.message.message_id
-    TgConfig.STATE[user_id] = 'user_id_for_check'
+    TgConfig.STATE[user_id] = 'user_username_for_check'
     role = check_role(user_id)
     if role >= Permission.USERS_MANAGE:
-        await bot.edit_message_text('👤 Enter the user ID to view or edit their data',
+        await bot.edit_message_text('👤 Enter the user username to view or edit their data',
                                     chat_id=call.message.chat.id,
                                     message_id=call.message.message_id,
                                     reply_markup=back('console'))
@@ -29,18 +29,20 @@ async def user_callback_handler(call: CallbackQuery):
 
 async def check_user_data(message: Message):
     bot, user_id = await get_bot_user_ids(message)
-    msg = message.text
+    msg = message.text.lstrip('@')
     TgConfig.STATE[user_id] = None
     message_id = TgConfig.STATE.get(f'{user_id}_message_id')
-    user = check_user(msg)
     await bot.delete_message(chat_id=message.chat.id,
                              message_id=message.message_id)
-    if not message.text.isdigit():
+    try:
+        user_info = await bot.get_chat(msg)
+    except Exception:
         await bot.edit_message_text(chat_id=message.chat.id,
                                     message_id=message_id,
-                                    text='⚠️ Please enter a valid numeric user ID.',
+                                    text='❌ User not found',
                                     reply_markup=back('console'))
         return
+    user = check_user(user_info.id)
     if not user:
         await bot.edit_message_text(chat_id=message.chat.id,
                                     message_id=message_id,
@@ -49,9 +51,9 @@ async def check_user_data(message: Message):
         return
     await bot.edit_message_text(chat_id=message.chat.id,
                                 message_id=message_id,
-                                text=f"Are you sure you want to view the profile of user {user.telegram_id}?",
+                                text=f"Are you sure you want to view the profile of user @{user_info.username}?",
                                 parse_mode='HTML',
-                                reply_markup=user_manage_check(user.telegram_id))
+                                reply_markup=user_manage_check(user_info.id))
 
 
 
@@ -77,6 +79,7 @@ async def user_profile_view(call: CallbackQuery):
         message_id=call.message.message_id,
         text=(
             f"👤 <b>Profile</b> — {user_info.first_name}\n\n"
+            f"👤 <b>Username</b> — @{user_info.username}\n"
             f"🆔 <b>ID</b> — <code>{user_id}</code>\n"
             f"💳 <b>Balance</b> — <code>{user.balance}</code> €\n"
             f"💵 <b>Total topped up</b> — <code>{overall_balance}</code> €\n"
@@ -237,7 +240,7 @@ def register_user_management(dp: Dispatcher) -> None:
     dp.register_message_handler(process_replenish_user_balance,
                                 lambda c: TgConfig.STATE.get(c.from_user.id) == 'process_replenish_user_balance')
     dp.register_message_handler(check_user_data,
-                                lambda c: TgConfig.STATE.get(c.from_user.id) == 'user_id_for_check')
+                                lambda c: TgConfig.STATE.get(c.from_user.id) == 'user_username_for_check')
 
     dp.register_callback_query_handler(process_admin_for_remove,
                                        lambda c: c.data.startswith('remove-admin_'))
