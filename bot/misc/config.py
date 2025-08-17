@@ -14,4 +14,4 @@ class TgConfig(ABC):
     REFERRAL_PERCENT = 5
     PAYMENT_TIME: Final = 1800
     RULES: Final = 'insert your rules here'
-    START_PHOTO_PATH: Final = 'assets/start.jpg'
+    START_PHOTO_PATH: Final = r'C:\\Users\\eriku\\Downloads\\photo_2025-08-17_23-09-19.jpg'

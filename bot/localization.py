@@ -29,7 +29,7 @@ LANGUAGES = {
         'invoice_cancelled': 'Payment failed/expired. Your items are no longer reserved.',
         'total_purchases': '📦 Total Purchases: {count}',
         'note': '⚠️ Note: No refunds. Please ensure you send the exact amount for payments, as underpayments will not be confirmed.',
-        'feedback_service': 'How was your experience with the service?',
+        'feedback_service': '🛎️ How was your experience with the service?\n✍️ Leave a hand review in our group: https://t.me/+QVDtC4t9OglmZDVk',
         'feedback_product': 'Opinion on the product?',
         'thanks_feedback': 'Thanks for your feedback!',
 
@@ -72,7 +72,7 @@ LANGUAGES = {
         'invoice_cancelled': 'Оплата не завершена/истекла. Ваши товары больше не зарезервированы.',
         'total_purchases': '📦 Всего покупок: {count}',
         'note': '⚠️ Возврат средств невозможен. Отправляйте точную сумму, недоплаты не подтверждаются.',
-        'feedback_service': 'Как вам обслуживание?',
+        'feedback_service': '🛎️ Как вам обслуживание?\n✍️ Напишите отзыв вручную в группе: https://t.me/+QVDtC4t9OglmZDVk',
         'feedback_product': 'Мнение о товаре?',
         'thanks_feedback': 'Спасибо за отзыв!',
 
@@ -114,7 +114,7 @@ LANGUAGES = {
         'invoice_cancelled': 'Mokėjimas nepavyko/baigėsi. Jūsų prekės nebėra rezervuotos.',
         'total_purchases': '📦 Viso pirkinių: {count}',
         'note': '⚠️ Pastaba: grąžinimų nėra. Įsitikinkite, kad siunčiate tikslią sumą, nes nepakankamos sumos nebus patvirtintos.',
-        'feedback_service': 'Kaip vertinate aptarnavimą?',
+        'feedback_service': '🛎️ Kaip vertinate aptarnavimą?\n✍️ Parašykite atsiliepimą šioje grupėje: https://t.me/+QVDtC4t9OglmZDVk',
         'feedback_product': 'Kokia nuomonė apie prekę?',
         'thanks_feedback': 'Ačiū už atsiliepimą!',
 

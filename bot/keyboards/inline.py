@@ -334,17 +334,20 @@ def blackjack_controls() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def blackjack_bet_menu(balance: float) -> InlineKeyboardMarkup:
+def blackjack_bet_menu(balance: float, recommendation: int) -> InlineKeyboardMarkup:
     inline_keyboard = []
     max_bet = min(5, int(balance))
     row = []
     for i in range(1, max_bet + 1):
-        row.append(InlineKeyboardButton(f'{i}€', callback_data=f'blackjack_bet_{i}'))
+        row.append(InlineKeyboardButton(f'💶 {i}€', callback_data=f'blackjack_bet_{i}'))
         if len(row) == 3:
             inline_keyboard.append(row)
             row = []
     if row:
         inline_keyboard.append(row)
+    if recommendation > 0:
+        inline_keyboard.append([InlineKeyboardButton(f'🤖 {recommendation}€', callback_data=f'blackjack_bet_{recommendation}')])
+    inline_keyboard.append([InlineKeyboardButton('✏️ Enter Bet', callback_data='blackjack_custom_bet')])
     inline_keyboard.append([InlineKeyboardButton('📜 History', callback_data='blackjack_history_0')])
     inline_keyboard.append([InlineKeyboardButton('🔙 Back to menu', callback_data='back_to_menu')])
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
@@ -370,5 +373,5 @@ def blackjack_history_menu(index: int, total: int) -> InlineKeyboardMarkup:
 
 
 def feedback_menu(prefix: str) -> InlineKeyboardMarkup:
-    buttons = [InlineKeyboardButton(str(i), callback_data=f'{prefix}_{i}') for i in range(1, 6)]
+    buttons = [InlineKeyboardButton('⭐' * i, callback_data=f'{prefix}_{i}') for i in range(1, 6)]
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
